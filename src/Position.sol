@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+//import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 contract PredictionMarket {
-    MockUSDC public mockUSDC;
+
     struct Position {
         uint256 positionId;
         string countryId;
@@ -25,9 +26,10 @@ contract PredictionMarket {
         SHORT
     }
 
+    address usdc;
     uint256 private nextPositionId;
     uint256 public CURRENT_PRICE = 120;
-    uint256 public TRANSACTION_FEE = 3000;
+    uint256 public TRANSACTION_FEE = 30;
     mapping(uint256 => Position) public positions;
 
     event PositionOpened(
@@ -49,16 +51,20 @@ contract PredictionMarket {
     error NotTheOwner();
     error Liquidated();
 
+    constructor(address _usdc) {
+        usdc = _usdc;
+    }
+
     function openPosition(
         string calldata countryId,
         PositionDirection direction,
         uint8 leverage,
         uint256 size
     ) external payable returns (uint256) {
-        if (size > 0) revert SizeShouldBeGreaterThanZero();
+        if (size == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
 
-        IERC20(mockUSDC).transferFrom(msg.sender, address(this), size);
+        IERC20(usdc).transferFrom(msg.sender, address(this), size);
 
         // Transfer fee
         uint256 fee = (size * TRANSACTION_FEE) / 10000;
@@ -103,12 +109,12 @@ contract PredictionMarket {
             if (CURRENT_PRICE > position.entryPrice) {
                 uint256 profit = (CURRENT_PRICE - position.entryPrice) * position.size * position.leverage / position.entryPrice;
                 //payable(msg.sender).transfer(profit + position.size);
-                IERC20(mockUSDC).transfer(msg.sender, profit + position.size);
+                IERC20(usdc).transfer(msg.sender, profit + position.size);
             } else {
                 uint256 loss = (position.entryPrice - CURRENT_PRICE) * position.size * position.leverage / position.entryPrice;
                 if (position.size  >= loss) revert Liquidated();
                 //payable(msg.sender).transfer(position.size - loss);
-                IERC20(mockUSDC).transfer(msg.sender, position.size - loss);
+                IERC20(usdc).transfer(msg.sender, position.size - loss);
             }
         } else {
             // Logic for closing a short position
@@ -116,10 +122,10 @@ contract PredictionMarket {
             if (CURRENT_PRICE > position.entryPrice) {
                 uint256 loss = (CURRENT_PRICE - position.entryPrice) * position.size * position.leverage / position.entryPrice;
                 if (position.size >= loss) revert Liquidated();
-                IERC20(mockUSDC).transfer(msg.sender, profit - position.size);
+                IERC20(usdc).transfer(msg.sender, position.size - loss);
             } else {
                 uint256 profit = (position.entryPrice - CURRENT_PRICE) * position.size * position.leverage / position.entryPrice;
-                IERC20(mockUSDC).transfer(msg.sender, position.size + loss);
+                IERC20(usdc).transfer(msg.sender, profit + position.size);
             }
         }
         
