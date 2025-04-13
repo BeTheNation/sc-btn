@@ -12,14 +12,15 @@ contract PredictionMarketTest is Test {
     }
 
     function test_OpenPosition() public {
-        uint256 positionId = predictionMarket.openPosition{value: 1 ether}("USA", true, 2);
+        //PredictionMarket.PositionDirection direction;
+        uint256 positionId = predictionMarket.openPosition{value: 1 ether}("USA", PredictionMarket.PositionDirection.LONG, 2, 1);
         //Position memory position = predictionMarket.getPosition(positionId);
         PredictionMarket.Position memory position = predictionMarket.getPosition(positionId);
 
         assertEq(position.countryId, "USA");
         assertEq(position.trader, address(this));
-        assertEq(position.direction, true);
-        assertEq(position.size, 1 ether);
+        assertEq(uint8(position.direction), uint8(PredictionMarket.PositionDirection.LONG));
+        assertEq(position.size, 1);
         assertEq(position.leverage, 2);
         assertEq(position.entryPrice, 100);
     }
