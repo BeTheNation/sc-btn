@@ -30,7 +30,7 @@ contract PredictionMarket {
     uint256 private nextPositionId;
     uint256 public CURRENT_PRICE = 120;
     uint256 public TRANSACTION_FEE = 30;
-    mapping(uint256 => Position) public positions;
+    mapping(address => Position) public positions;
 
     event PositionOpened(
         uint256 indexed positionId,
@@ -44,12 +44,22 @@ contract PredictionMarket {
 
     event PositionClosed(uint256 indexed positionId);
     event TPSLSet(uint256 indexed positionId, uint256 takeProfit, uint256 stopLoss);
+    event LimitPositionOpened(
+        uint256 indexed positionId,
+        string countryId,
+        address indexed trader,
+        PositionDirection direction,
+        uint256 size,
+        uint8 leverage,
+        uint256 entryPrice
+    );
 
     error SizeShouldBeGreaterThanZero();
     error LeverageShouldBeBetweenOneAndFive();
     error PositionDoesNotExist();
     error NotTheOwner();
     error Liquidated();
+    error PositionAlreadyExist();
 
     constructor(address _usdc) {
         usdc = _usdc;
@@ -60,7 +70,7 @@ contract PredictionMarket {
         PositionDirection direction,
         uint8 leverage,
         uint256 size
-    ) external payable returns (uint256) {
+    ) external payable {
         if (size == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
 
@@ -69,8 +79,8 @@ contract PredictionMarket {
         // Transfer fee
         uint256 fee = (size * TRANSACTION_FEE) / 10000;
         
-        uint256 positionId = nextPositionId++;
-        positions[positionId] = Position({
+        //uint256 positionId = nextPositionId++;
+        positions[msg.sender] = Position({
             positionId: positionId,
             countryId: countryId,
             trader: msg.sender,
@@ -93,12 +103,64 @@ contract PredictionMarket {
             leverage,
             100
         );
-
-        return positionId;
     }
 
-    function closePosition(uint256 positionId) external {
-        Position storage position = positions[positionId];
+    function limitOrder(uint256 size, uint256 leverage, uint256 _entryPrice) external {
+        if (size == 0) revert SizeShouldBeGreaterThanZero();
+        if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
+        IERC20(usdc).transferFrom(msg.sender, address(this), size);
+
+        // Transfer fee
+        uint256 fee = (size * TRANSACTION_FEE) / 10000;
+        
+        //uint256 positionId = nextPositionId++;
+        positions[msg.sender] = Position({
+            positionId: positionId,
+            countryId: countryId,
+            trader: msg.sender,
+            direction: direction,
+            size: size - fee,
+            leverage: leverage,
+            entryPrice: _entryPrice,
+            openTime: block.number,
+            takeProfit: 0,
+            stopLoss: 0,
+            isOpen: false
+        });
+
+        emit LimitPositionOpened(
+            positionId,
+            countryId,
+            msg.sender,
+            direction,
+            size,
+            leverage,
+            entryPrice
+        );
+    }
+
+    function executeLimitOrder(address _sender) external {
+        Position storage position = positions[_sender];
+        if (position.isOpen == false) revert PositionAlreadyExist();
+        if (position.trader != msg.sender) revert NotTheOwner();
+
+        // Logic to check if the limit order can be executed
+        if (CURRENT_PRICE >= position.entryPrice) {
+            position.isOpen = true;
+            emit PositionOpened(
+                positionId,
+                position.countryId,
+                msg.sender,
+                position.direction,
+                position.size,
+                position.leverage,
+                position.entryPrice
+            );
+        }
+    }
+
+    function closePosition() external {
+        Position storage position = positions[msg.sender];
         if (position.isOpen == false) revert PositionDoesNotExist();
         if (position.trader != msg.sender) revert NotTheOwner();
 
@@ -133,11 +195,10 @@ contract PredictionMarket {
     }
 
     function setTPSL(
-        uint256 positionId,
         uint256 takeProfit,
         uint256 stopLoss
     ) external {
-        Position storage position = positions[positionId];
+        Position storage position = positions[msg.sender];
         require(position.isOpen, "Position closed");
         require(position.trader == msg.sender, "Not position owner");
 
