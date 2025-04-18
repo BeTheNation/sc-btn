@@ -19,6 +19,7 @@ contract PredictionMarket {
         uint256 takeProfit;
         uint256 stopLoss;
         bool isOpen;
+        uint256 liquidationPrice;
     }
 
     enum PositionDirection {
@@ -30,7 +31,9 @@ contract PredictionMarket {
     uint256 private nextPositionId;
     uint256 public CURRENT_PRICE = 120;
     uint256 public TRANSACTION_FEE = 30;
+    uint256 public MAINTENANCE_MARGIN = 10; // 10% maintenance margin
     mapping(address => Position) public positions;
+    mapping(address => uint256) public positionIdToPosition;
 
     event PositionOpened(
         uint256 indexed positionId,
@@ -39,11 +42,12 @@ contract PredictionMarket {
         PositionDirection direction,
         uint256 size,
         uint8 leverage,
-        uint256 entryPrice
+        uint256 entryPrice,
+        uint256 liquidationPrice
     );
 
-    event PositionClosed(uint256 indexed positionId);
-    event TPSLSet(uint256 indexed positionId, uint256 takeProfit, uint256 stopLoss);
+    event PositionClosed(address sender);
+    event TPSLSet(address sender, uint256 takeProfit, uint256 stopLoss);
     event LimitPositionOpened(
         uint256 indexed positionId,
         string countryId,
@@ -51,7 +55,8 @@ contract PredictionMarket {
         PositionDirection direction,
         uint256 size,
         uint8 leverage,
-        uint256 entryPrice
+        uint256 entryPrice,
+        uint256 liquidationPrice
     );
 
     error SizeShouldBeGreaterThanZero();
@@ -70,9 +75,13 @@ contract PredictionMarket {
         PositionDirection direction,
         uint8 leverage,
         uint256 size
-    ) external payable {
+    ) external payable returns (address){
         if (size == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
+
+        uint256 positionId = positionIdToPosition[msg.sender];
+        positionIdToPosition[msg.sender] = positionId++;
+        positionId = positionIdToPosition[msg.sender];
 
         IERC20(usdc).transferFrom(msg.sender, address(this), size);
 
@@ -91,8 +100,11 @@ contract PredictionMarket {
             openTime: block.number,
             takeProfit: 0,
             stopLoss: 0,
-            isOpen: true
+            isOpen: true,
+            liquidationPrice: 0
         });
+
+        uint256 liquidation = calculateLiquidation(msg.sender);
 
         emit PositionOpened(
             positionId,
@@ -101,45 +113,56 @@ contract PredictionMarket {
             direction,
             size,
             leverage,
-            100
+            100,
+            liquidation
         );
+
+        return msg.sender;
     }
 
-    function limitOrder(uint256 size, uint256 leverage, uint256 _entryPrice) external {
+    function limitOrder(string calldata countryId, uint256 size, uint8 leverage, uint256 _entryPrice, PositionDirection _direction) external {
         if (size == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
         IERC20(usdc).transferFrom(msg.sender, address(this), size);
 
         // Transfer fee
         uint256 fee = (size * TRANSACTION_FEE) / 10000;
+
+        uint256 positionId = positionIdToPosition[msg.sender];
+        positionIdToPosition[msg.sender] = positionId++;
+        positionId = positionIdToPosition[msg.sender];
         
         //uint256 positionId = nextPositionId++;
         positions[msg.sender] = Position({
             positionId: positionId,
             countryId: countryId,
             trader: msg.sender,
-            direction: direction,
+            direction: _direction,
             size: size - fee,
             leverage: leverage,
             entryPrice: _entryPrice,
             openTime: block.number,
             takeProfit: 0,
             stopLoss: 0,
-            isOpen: false
+            isOpen: false,
+            liquidationPrice: 0
         });
+
+        uint256 liquidation = calculateLiquidation(msg.sender);
 
         emit LimitPositionOpened(
             positionId,
             countryId,
             msg.sender,
-            direction,
+            _direction,
             size,
             leverage,
-            entryPrice
+            _entryPrice,
+            liquidation
         );
     }
 
-    function executeLimitOrder(address _sender) external {
+    function executeLimitOrder(address _sender, uint256 positionId) external {
         Position storage position = positions[_sender];
         if (position.isOpen == false) revert PositionAlreadyExist();
         if (position.trader != msg.sender) revert NotTheOwner();
@@ -154,13 +177,14 @@ contract PredictionMarket {
                 position.direction,
                 position.size,
                 position.leverage,
-                position.entryPrice
+                position.entryPrice,
+                position.liquidationPrice
             );
         }
     }
 
-    function closePosition() external {
-        Position storage position = positions[msg.sender];
+    function closePosition(address sender) external {
+        Position storage position = positions[sender];
         if (position.isOpen == false) revert PositionDoesNotExist();
         if (position.trader != msg.sender) revert NotTheOwner();
 
@@ -191,7 +215,7 @@ contract PredictionMarket {
             }
         }
         
-        emit PositionClosed(positionId);
+        emit PositionClosed(sender);
     }
 
     function setTPSL(
@@ -204,15 +228,26 @@ contract PredictionMarket {
 
         position.takeProfit = takeProfit;
         position.stopLoss = stopLoss;
-        emit TPSLSet(positionId, takeProfit, stopLoss);
+        emit TPSLSet(msg.sender, takeProfit, stopLoss);
     }
 
-    function getPosition(uint256 positionId) external view returns (Position memory) {
-        return positions[positionId];
+    function getPosition() external view returns (Position memory) {
+        return positions[msg.sender];
     }
 
-    function calculateLiquidation() external view returns (uint256) {
+    function calculateLiquidation(address _sender) public view returns (uint256) {
         // Logic to calculate liquidation price based on position details
-        return 0; // Placeholder
+        Position memory position = positions[_sender];
+        if (position.isOpen == false) revert PositionDoesNotExist();
+        if (position.trader != _sender) revert NotTheOwner();
+        uint256 _leverage = uint256(position.leverage);
+        uint256 liquidationPrice;
+
+        if(position.direction == PositionDirection.LONG) {
+            liquidationPrice = position.entryPrice * _leverage/_leverage + 1 - (_leverage * MAINTENANCE_MARGIN);
+        } else {
+            liquidationPrice = position.entryPrice * _leverage/_leverage - 1 - (_leverage * MAINTENANCE_MARGIN);
+        }
+        return liquidationPrice; // Placeholder
     }
 }

@@ -25,10 +25,10 @@ contract PredictionMarketTest is Test {
         IERC20(mockUSDC).approve(address(predictionMarket), 100e6);
         //PredictionMarket.PositionDirection direction;
         //uint256 positionId = predictionMarket.openPosition{value: 1 ether}("USA", PredictionMarket.PositionDirection.LONG, 2, 1);
-        uint256 positionId = predictionMarket.openPosition("USA", PredictionMarket.PositionDirection.LONG, 2, 1);
+        address user = predictionMarket.openPosition("USA", PredictionMarket.PositionDirection.LONG, 2, 1);
+        PredictionMarket.Position memory position = predictionMarket.getPosition();
         vm.stopPrank();
         //Position memory position = predictionMarket.getPosition(positionId);
-        PredictionMarket.Position memory position = predictionMarket.getPosition(positionId);
 
         assertEq(position.countryId, "USA");
         assertEq(position.trader, trader);
@@ -42,13 +42,13 @@ contract PredictionMarketTest is Test {
         vm.startPrank(trader);
         IERC20(mockUSDC).approve(address(predictionMarket), 10e6);
         console.log("balance before open position: ", mockUSDC.balanceOf(trader));
-        uint256 positionId = predictionMarket.openPosition("USA", PredictionMarket.PositionDirection.LONG, 2, 10e6);
+        address user = predictionMarket.openPosition("USA", PredictionMarket.PositionDirection.LONG, 2, 10e6);
         console.log("balance after open position: ", mockUSDC.balanceOf(trader));
-        predictionMarket.closePosition(positionId);
+        predictionMarket.closePosition(user);
         console.log("balance after close position: ", mockUSDC.balanceOf(trader));
         vm.stopPrank();
 
-        PredictionMarket.Position memory position = predictionMarket.getPosition(positionId);
+        PredictionMarket.Position memory position = predictionMarket.getPosition();
 
         assertEq(position.isOpen, false);
     }
