@@ -2,8 +2,6 @@
 pragma solidity ^0.8.0;
 
 //import {console} from "forge-std/console.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 contract PredictionMarket {
 
@@ -27,7 +25,6 @@ contract PredictionMarket {
         SHORT
     }
 
-    address usdc;
     uint256 private nextPositionId;
     uint256 public CURRENT_PRICE = 120;
     uint256 public TRANSACTION_FEE = 30;
@@ -41,7 +38,6 @@ contract PredictionMarket {
         address indexed trader,
         PositionDirection direction,
         uint256 size,
-        uint8 leverage,
         uint256 entryPrice,
         uint256 liquidationPrice
     );
@@ -65,36 +61,30 @@ contract PredictionMarket {
     error NotTheOwner();
     error Liquidated();
     error PositionAlreadyExist();
-
-    constructor(address _usdc) {
-        usdc = _usdc;
-    }
+    error InsufficientETH();
 
     function openPosition(
         string calldata countryId,
         PositionDirection direction,
-        uint8 leverage,
-        uint256 size
+        uint8 leverage
     ) external payable returns (address){
-        if (size == 0) revert SizeShouldBeGreaterThanZero();
+        if (msg.value == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
 
         uint256 positionId = positionIdToPosition[msg.sender];
         positionIdToPosition[msg.sender] = positionId++;
         positionId = positionIdToPosition[msg.sender];
 
-        IERC20(usdc).transferFrom(msg.sender, address(this), size);
-
-        // Transfer fee
-        uint256 fee = (size * TRANSACTION_FEE) / 10000;
+        // Calculate fee from ETH sent
+        uint256 fee = (msg.value * TRANSACTION_FEE) / 10000;
+        uint256 size = msg.value - fee;
         
-        //uint256 positionId = nextPositionId++;
         positions[msg.sender] = Position({
             positionId: positionId,
             countryId: countryId,
             trader: msg.sender,
             direction: direction,
-            size: size - fee,
+            size: size,
             leverage: leverage,
             entryPrice: 100,
             openTime: block.number,
@@ -111,8 +101,7 @@ contract PredictionMarket {
             countryId,
             msg.sender,
             direction,
-            size,
-            leverage,
+            msg.value,
             100,
             liquidation
         );
@@ -120,25 +109,24 @@ contract PredictionMarket {
         return msg.sender;
     }
 
-    function limitOrder(string calldata countryId, uint256 size, uint8 leverage, uint256 _entryPrice, PositionDirection _direction) external {
-        if (size == 0) revert SizeShouldBeGreaterThanZero();
+    function limitOrder(string calldata countryId, uint8 leverage, uint256 _entryPrice, PositionDirection _direction) external payable {
+        if (msg.value == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
-        IERC20(usdc).transferFrom(msg.sender, address(this), size);
-
-        // Transfer fee
-        uint256 fee = (size * TRANSACTION_FEE) / 10000;
+        
+        // Calculate fee from ETH sent
+        uint256 fee = (msg.value * TRANSACTION_FEE) / 10000;
+        uint256 size = msg.value - fee;
 
         uint256 positionId = positionIdToPosition[msg.sender];
         positionIdToPosition[msg.sender] = positionId++;
         positionId = positionIdToPosition[msg.sender];
         
-        //uint256 positionId = nextPositionId++;
         positions[msg.sender] = Position({
             positionId: positionId,
             countryId: countryId,
             trader: msg.sender,
             direction: _direction,
-            size: size - fee,
+            size: size,
             leverage: leverage,
             entryPrice: _entryPrice,
             openTime: block.number,
@@ -155,7 +143,7 @@ contract PredictionMarket {
             countryId,
             msg.sender,
             _direction,
-            size,
+            msg.value,
             leverage,
             _entryPrice,
             liquidation
@@ -176,7 +164,6 @@ contract PredictionMarket {
                 msg.sender,
                 position.direction,
                 position.size,
-                position.leverage,
                 position.entryPrice,
                 position.liquidationPrice
             );
@@ -191,27 +178,43 @@ contract PredictionMarket {
         position.isOpen = false;
         if (position.direction == PositionDirection.LONG) {
             // Logic for closing a long position
-            // For simplicity, we assume the price is 100 when closing
             if (CURRENT_PRICE > position.entryPrice) {
-                uint256 profit = (CURRENT_PRICE - position.entryPrice) * position.size * position.leverage / position.entryPrice;
-                //payable(msg.sender).transfer(profit + position.size);
-                IERC20(usdc).transfer(msg.sender, profit + position.size);
+                // Calculate profit as percentage gain * position size * leverage
+                uint256 percentageGain = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice; // in basis points
+                uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
+                uint256 payout = position.size + profit;
+                
+                // Ensure contract has enough ETH to pay
+                require(address(this).balance >= payout, "Insufficient contract balance");
+                payable(msg.sender).transfer(payout);
             } else {
-                uint256 loss = (position.entryPrice - CURRENT_PRICE) * position.size * position.leverage / position.entryPrice;
-                if (position.size  >= loss) revert Liquidated();
-                //payable(msg.sender).transfer(position.size - loss);
-                IERC20(usdc).transfer(msg.sender, position.size - loss);
+                // Calculate loss as percentage loss * position size * leverage
+                uint256 percentageLoss = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice; // in basis points
+                uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
+                
+                if (loss >= position.size) revert Liquidated();
+                uint256 payout = position.size - loss;
+                payable(msg.sender).transfer(payout);
             }
         } else {
             // Logic for closing a short position
-            // For simplicity, we assume the price is 100 when closing
             if (CURRENT_PRICE > position.entryPrice) {
-                uint256 loss = (CURRENT_PRICE - position.entryPrice) * position.size * position.leverage / position.entryPrice;
-                if (position.size >= loss) revert Liquidated();
-                IERC20(usdc).transfer(msg.sender, position.size - loss);
+                // Calculate loss for short position when price goes up
+                uint256 percentageLoss = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice; // in basis points
+                uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
+                
+                if (loss >= position.size) revert Liquidated();
+                uint256 payout = position.size - loss;
+                payable(msg.sender).transfer(payout);
             } else {
-                uint256 profit = (position.entryPrice - CURRENT_PRICE) * position.size * position.leverage / position.entryPrice;
-                IERC20(usdc).transfer(msg.sender, profit + position.size);
+                // Calculate profit for short position when price goes down
+                uint256 percentageGain = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice; // in basis points
+                uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
+                uint256 payout = position.size + profit;
+                
+                // Ensure contract has enough ETH to pay
+                require(address(this).balance >= payout, "Insufficient contract balance");
+                payable(msg.sender).transfer(payout);
             }
         }
         
