@@ -367,4 +367,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Contract Address**: `0x34662e1BE68A95141550c69c4aD7844EA2314b0D`  
 **Network**: Base Sepolia (84532)  
-**Frontend**: [../Frontend-btn](../Frontend-btn)
+**Frontend**: [Frontend-btn](https://github.com/BeTheNation/Frontend-btn)
