@@ -42,8 +42,18 @@ contract PredictionMarket {
         uint256 liquidationPrice
     );
 
-    event PositionClosed(address sender);
+    event PositionClosed(
+        uint256 indexed positionId,
+        string countryId,
+        address indexed trader,
+        uint256 size,
+        int256 pnl,
+        bool liquidated,
+        uint256 exitPrice
+    );
+
     event TPSLSet(address sender, uint256 takeProfit, uint256 stopLoss);
+    
     event LimitPositionOpened(
         uint256 indexed positionId,
         string countryId,
@@ -152,8 +162,8 @@ contract PredictionMarket {
 
     function executeLimitOrder(address _sender, uint256 positionId) external {
         Position storage position = positions[_sender];
-        if (position.isOpen == false) revert PositionAlreadyExist();
-        if (position.trader != msg.sender) revert NotTheOwner();
+        if (position.isOpen == true) revert PositionAlreadyExist();
+        if (position.trader != _sender) revert NotTheOwner();
 
         // Logic to check if the limit order can be executed
         if (CURRENT_PRICE >= position.entryPrice) {
@@ -161,7 +171,7 @@ contract PredictionMarket {
             emit PositionOpened(
                 positionId,
                 position.countryId,
-                msg.sender,
+                _sender,
                 position.direction,
                 position.size,
                 position.entryPrice,
@@ -175,26 +185,50 @@ contract PredictionMarket {
         if (position.isOpen == false) revert PositionDoesNotExist();
         if (position.trader != msg.sender) revert NotTheOwner();
 
+        // Store position data before closing for event emission
+        uint256 positionId = position.positionId;
+        uint256 size = position.size;
+        uint256 exitPrice = CURRENT_PRICE;
+        int256 pnl = 0;
+        bool liquidated = false;
+
+        // Close position first to prevent reentrancy
         position.isOpen = false;
+        
         if (position.direction == PositionDirection.LONG) {
             // Logic for closing a long position
             if (CURRENT_PRICE > position.entryPrice) {
                 // Calculate profit as percentage gain * position size * leverage
                 uint256 percentageGain = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice; // in basis points
                 uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
+                pnl = int256(profit); // Positive PnL for profit
                 uint256 payout = position.size + profit;
                 
-                // Ensure contract has enough ETH to pay
-                require(address(this).balance >= payout, "Insufficient contract balance");
-                payable(msg.sender).transfer(payout);
+                // Ensure contract has enough ETH to pay, fallback to original size if not
+                if (address(this).balance >= payout) {
+                    (bool success, ) = payable(msg.sender).call{value: payout}("");
+                    require(success, "Transfer failed");
+                } else {
+                    // Fallback: return original position size if insufficient balance for profit
+                    (bool success, ) = payable(msg.sender).call{value: position.size}("");
+                    require(success, "Transfer failed");
+                    pnl = 0; // No profit due to insufficient contract balance
+                }
             } else {
                 // Calculate loss as percentage loss * position size * leverage
                 uint256 percentageLoss = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice; // in basis points
                 uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
                 
-                if (loss >= position.size) revert Liquidated();
-                uint256 payout = position.size - loss;
-                payable(msg.sender).transfer(payout);
+                if (loss >= position.size) {
+                    liquidated = true;
+                    pnl = -int256(position.size); // Total loss
+                    // Don't transfer anything - total liquidation
+                } else {
+                    pnl = -int256(loss); // Negative PnL for loss
+                    uint256 payout = position.size - loss;
+                    (bool success, ) = payable(msg.sender).call{value: payout}("");
+                    require(success, "Transfer failed");
+                }
             }
         } else {
             // Logic for closing a short position
@@ -203,22 +237,45 @@ contract PredictionMarket {
                 uint256 percentageLoss = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice; // in basis points
                 uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
                 
-                if (loss >= position.size) revert Liquidated();
-                uint256 payout = position.size - loss;
-                payable(msg.sender).transfer(payout);
+                if (loss >= position.size) {
+                    liquidated = true;
+                    pnl = -int256(position.size); // Total loss
+                    // Don't transfer anything - total liquidation
+                } else {
+                    pnl = -int256(loss); // Negative PnL for loss
+                    uint256 payout = position.size - loss;
+                    (bool success, ) = payable(msg.sender).call{value: payout}("");
+                    require(success, "Transfer failed");
+                }
             } else {
                 // Calculate profit for short position when price goes down
                 uint256 percentageGain = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice; // in basis points
                 uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
+                pnl = int256(profit); // Positive PnL for profit
                 uint256 payout = position.size + profit;
                 
-                // Ensure contract has enough ETH to pay
-                require(address(this).balance >= payout, "Insufficient contract balance");
-                payable(msg.sender).transfer(payout);
+                // Ensure contract has enough ETH to pay, fallback to original size if not
+                if (address(this).balance >= payout) {
+                    (bool success, ) = payable(msg.sender).call{value: payout}("");
+                    require(success, "Transfer failed");
+                } else {
+                    // Fallback: return original position size if insufficient balance for profit
+                    (bool success, ) = payable(msg.sender).call{value: position.size}("");
+                    require(success, "Transfer failed");
+                    pnl = 0; // No profit due to insufficient contract balance
+                }
             }
         }
         
-        emit PositionClosed(sender);
+        emit PositionClosed(
+            positionId,
+            position.countryId,
+            msg.sender,
+            size,
+            pnl,
+            liquidated,
+            exitPrice
+        );
     }
 
     function setTPSL(
@@ -243,14 +300,17 @@ contract PredictionMarket {
         Position memory position = positions[_sender];
         if (position.isOpen == false) revert PositionDoesNotExist();
         if (position.trader != _sender) revert NotTheOwner();
-        uint256 _leverage = uint256(position.leverage);
+        
         uint256 liquidationPrice;
+        uint256 marginPercentage = (100 - MAINTENANCE_MARGIN); // 90% for 10% maintenance margin
 
         if(position.direction == PositionDirection.LONG) {
-            liquidationPrice = position.entryPrice * _leverage/_leverage + 1 - (_leverage * MAINTENANCE_MARGIN);
+            // For long: liquidation when price drops by margin percentage / leverage
+            liquidationPrice = (position.entryPrice * marginPercentage) / (100 * position.leverage);
         } else {
-            liquidationPrice = position.entryPrice * _leverage/_leverage - 1 - (_leverage * MAINTENANCE_MARGIN);
+            // For short: liquidation when price rises by margin percentage / leverage  
+            liquidationPrice = position.entryPrice + ((position.entryPrice * marginPercentage) / (100 * position.leverage));
         }
-        return liquidationPrice; // Placeholder
+        return liquidationPrice;
     }
 }
