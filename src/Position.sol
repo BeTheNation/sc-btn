@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 contract PredictionMarket {
-
     struct Position {
         uint256 positionId;
         string countryId;
@@ -25,7 +24,7 @@ contract PredictionMarket {
     uint256 public TRANSACTION_FEE = 30;
     mapping(address => Position) public positions;
     mapping(address => uint256) public positionIdToPosition;
-    
+
     // Reentrancy guard
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
@@ -67,11 +66,11 @@ contract PredictionMarket {
         _status = _NOT_ENTERED;
     }
 
-    function openPosition(
-        string calldata countryId,
-        PositionDirection direction,
-        uint8 leverage
-    ) external payable returns (address){
+    function openPosition(string calldata countryId, PositionDirection direction, uint8 leverage)
+        external
+        payable
+        returns (address)
+    {
         if (msg.value == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
 
@@ -81,7 +80,7 @@ contract PredictionMarket {
 
         uint256 fee = (msg.value * TRANSACTION_FEE) / 10000;
         uint256 size = msg.value - fee;
-        
+
         // Create new position
         positions[msg.sender] = Position({
             positionId: positionId,
@@ -95,14 +94,7 @@ contract PredictionMarket {
             isOpen: true
         });
 
-        emit PositionOpened(
-            positionId,
-            countryId,
-            msg.sender,
-            direction,
-            msg.value,
-            100
-        );
+        emit PositionOpened(positionId, countryId, msg.sender, direction, msg.value, 100);
 
         return msg.sender;
     }
@@ -120,7 +112,7 @@ contract PredictionMarket {
         uint256 payout = 0;
 
         position.isOpen = false;
-        
+
         // Calculate PnL and payout
         if (position.direction == PositionDirection.LONG) {
             // Long position logic
@@ -130,7 +122,7 @@ contract PredictionMarket {
                 uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
                 pnl = int256(profit);
                 uint256 totalPayout = position.size + profit;
-                
+
                 if (address(this).balance >= totalPayout) {
                     payout = totalPayout;
                 } else {
@@ -141,7 +133,7 @@ contract PredictionMarket {
                 // Loss for long
                 uint256 percentageLoss = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice;
                 uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
-                
+
                 if (loss >= position.size) {
                     pnl = -int256(position.size);
                     payout = 0;
@@ -156,7 +148,7 @@ contract PredictionMarket {
                 // Loss for short
                 uint256 percentageLoss = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice;
                 uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
-                
+
                 if (loss >= position.size) {
                     pnl = -int256(position.size);
                     payout = 0;
@@ -170,7 +162,7 @@ contract PredictionMarket {
                 uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
                 pnl = int256(profit);
                 uint256 totalPayout = position.size + profit;
-                
+
                 if (address(this).balance >= totalPayout) {
                     payout = totalPayout;
                 } else {
@@ -179,19 +171,12 @@ contract PredictionMarket {
                 }
             }
         }
-        
-        emit PositionClosed(
-            positionId,
-            countryId,
-            msg.sender,
-            size,
-            pnl,
-            exitPrice
-        );
-        
+
+        emit PositionClosed(positionId, countryId, msg.sender, size, pnl, exitPrice);
+
         // Transfer payout
         if (payout > 0) {
-            (bool success, ) = payable(msg.sender).call{value: payout}("");
+            (bool success,) = payable(msg.sender).call{value: payout}("");
             require(success, "Transfer failed");
         }
     }

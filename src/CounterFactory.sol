@@ -20,7 +20,7 @@ contract CounterFactory {
         number++;
     }
 
-    function newCounter(uint256 _id) public returns (address){
+    function newCounter(uint256 _id) public returns (address) {
         counterUpgrade = new CounterUpgrade(_id);
         return address(counterUpgrade);
     }

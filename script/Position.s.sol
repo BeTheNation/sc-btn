@@ -11,7 +11,7 @@ contract PositionScript is Script {
         vm.startBroadcast();
 
         PredictionMarket position = new PredictionMarket();
-        
+
         console.log("PredictionMarket contract deployed to:", address(position));
 
         vm.stopBroadcast();

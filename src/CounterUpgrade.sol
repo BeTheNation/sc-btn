@@ -16,5 +16,4 @@ contract CounterUpgrade {
     function increment() public {
         number++;
     }
-
 }
