@@ -1,18 +1,27 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-import {Script, console} from "forge-std/Script.sol";
+import "forge-std/Script.sol";
+import "forge-std/console.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {PredictionMarket} from "../src/Position.sol";
 
-contract PositionScript is Script {
-    function setUp() public {}
+contract DeployUpgradeablePosition is Script {
+    function run() external {
+        uint256 privateKey = vm.envUint("DEPLOYER_WALLET_PRIVATE_KEY");
+        vm.startBroadcast(privateKey);
 
-    function run() public {
-        vm.startBroadcast();
+        PredictionMarket implementation = new PredictionMarket();
+        console.log("Implementation deployed to:", address(implementation));
 
-        PredictionMarket position = new PredictionMarket();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(implementation),
+            abi.encodeWithSelector(PredictionMarket.initialize.selector)
+        );
+        console.log("Proxy deployed to:", address(proxy));
 
-        console.log("PredictionMarket contract deployed to:", address(position));
+        PredictionMarket predictionMarket = PredictionMarket(address(proxy));
+        console.log("PredictionMarket proxy address:", address(predictionMarket));
 
         vm.stopBroadcast();
     }

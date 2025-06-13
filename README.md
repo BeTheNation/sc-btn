@@ -23,7 +23,10 @@ forge build
 
 ## Contract
 
-**Deployed on Base Sepolia**: `0x18A5b0c7F046d1f37f70152012170afe70684080`
+**Deployed on Base Sepolia**: `0xd321D80155A27A1344ab5703cDDefD2b0fAF92e5` (Upgradeable Proxy)  
+**Implementation**: `0x53ec36A1Ab0027dCF6d9442aF42Fa43De6dAE702` ([View Code](https://sepolia.basescan.org/address/0x53ec36A1Ab0027dCF6d9442aF42Fa43De6dAE702#code))
+
+> **Note**: Always use the proxy address above for interactions. The implementation address contains your actual contract code.
 
 ### Features
 - Open LONG/SHORT positions with ETH

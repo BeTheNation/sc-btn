@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract PredictionMarket {
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
+contract PredictionMarket is Initializable, ReentrancyGuardUpgradeable, UUPSUpgradeable, OwnableUpgradeable {
     struct Position {
         uint256 positionId;
         string countryId;
@@ -20,15 +25,11 @@ contract PredictionMarket {
     }
 
     uint256 private nextPositionId;
-    uint256 public CURRENT_PRICE = 120;
-    uint256 public TRANSACTION_FEE = 30;
+    uint256 public CURRENT_PRICE;
+    uint256 public TRANSACTION_FEE;
+    uint256 public constant LIQUIDATION_THRESHOLD = 8000;
     mapping(address => Position) public positions;
     mapping(address => uint256) public positionIdToPosition;
-
-    // Reentrancy guard
-    uint256 private constant _NOT_ENTERED = 1;
-    uint256 private constant _ENTERED = 2;
-    uint256 private _status;
 
     event PositionOpened(
         uint256 indexed positionId,
@@ -54,34 +55,40 @@ contract PredictionMarket {
     error NotTheOwner();
     error PositionAlreadyExist();
     error InsufficientETH();
+    error PositionNotLiquidatable();
+    error InvalidPositionId();
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _status = _NOT_ENTERED;
+        _disableInitializers();
     }
 
-    modifier nonReentrant() {
-        require(_status != _ENTERED, "ReentrancyGuard: reentrant call");
-        _status = _ENTERED;
-        _;
-        _status = _NOT_ENTERED;
+    function initialize() public initializer {
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+        __Ownable_init(msg.sender);
+        CURRENT_PRICE = 120;
+        TRANSACTION_FEE = 30;
     }
 
-    function openPosition(string calldata countryId, PositionDirection direction, uint8 leverage)
+    function setCurrentPrice(uint256 newPrice) external {
+        CURRENT_PRICE = newPrice;
+    }
+
+    function openPosition(string calldata countryId, PositionDirection direction, uint8 leverage, uint256 positionId, uint256 entryPrice)
         external
         payable
         returns (address)
     {
         if (msg.value == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
+        if (positions[msg.sender].isOpen) revert PositionAlreadyExist();
 
-        uint256 positionId = positionIdToPosition[msg.sender];
-        positionIdToPosition[msg.sender] = positionId++;
-        positionId = positionIdToPosition[msg.sender];
+        positionIdToPosition[msg.sender] = positionId;
 
         uint256 fee = (msg.value * TRANSACTION_FEE) / 10000;
         uint256 size = msg.value - fee;
 
-        // Create new position
         positions[msg.sender] = Position({
             positionId: positionId,
             countryId: countryId,
@@ -89,12 +96,12 @@ contract PredictionMarket {
             direction: direction,
             size: size,
             leverage: leverage,
-            entryPrice: 100,
+            entryPrice: entryPrice,
             openTime: block.number,
             isOpen: true
         });
 
-        emit PositionOpened(positionId, countryId, msg.sender, direction, msg.value, 100);
+        emit PositionOpened(positionId, countryId, msg.sender, direction, msg.value, entryPrice);
 
         return msg.sender;
     }
@@ -113,11 +120,8 @@ contract PredictionMarket {
 
         position.isOpen = false;
 
-        // Calculate PnL and payout
         if (position.direction == PositionDirection.LONG) {
-            // Long position logic
             if (CURRENT_PRICE > position.entryPrice) {
-                // Profit for long
                 uint256 percentageGain = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice;
                 uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
                 pnl = int256(profit);
@@ -130,7 +134,6 @@ contract PredictionMarket {
                     pnl = 0;
                 }
             } else {
-                // Loss for long
                 uint256 percentageLoss = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice;
                 uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
 
@@ -143,9 +146,7 @@ contract PredictionMarket {
                 }
             }
         } else {
-            // Short position logic
             if (CURRENT_PRICE > position.entryPrice) {
-                // Loss for short
                 uint256 percentageLoss = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice;
                 uint256 loss = (position.size * percentageLoss * position.leverage) / 10000;
 
@@ -157,7 +158,6 @@ contract PredictionMarket {
                     payout = position.size - loss;
                 }
             } else {
-                // Profit for short
                 uint256 percentageGain = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice;
                 uint256 profit = (position.size * percentageGain * position.leverage) / 10000;
                 pnl = int256(profit);
@@ -174,7 +174,6 @@ contract PredictionMarket {
 
         emit PositionClosed(positionId, countryId, msg.sender, size, pnl, exitPrice);
 
-        // Transfer payout
         if (payout > 0) {
             (bool success,) = payable(msg.sender).call{value: payout}("");
             require(success, "Transfer failed");
@@ -184,4 +183,42 @@ contract PredictionMarket {
     function getPosition() external view returns (Position memory) {
         return positions[msg.sender];
     }
+
+    function checkLiquidation(address user) external view returns (bool) {
+        Position memory position = positions[user];
+        if (!position.isOpen) return false;
+
+        uint256 percentageLoss;
+        
+        if (position.direction == PositionDirection.LONG) {
+            if (CURRENT_PRICE >= position.entryPrice) return false;
+            percentageLoss = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice;
+        } else {
+            if (CURRENT_PRICE <= position.entryPrice) return false;
+            percentageLoss = ((CURRENT_PRICE - position.entryPrice) * 10000) / position.entryPrice;
+        }
+
+        uint256 leveragedLoss = percentageLoss * position.leverage;
+        return leveragedLoss >= LIQUIDATION_THRESHOLD;
+    }
+
+    function liquidate(address user) external nonReentrant {
+        Position storage position = positions[user];
+        if (!position.isOpen) revert PositionDoesNotExist();
+        if (!this.checkLiquidation(user)) revert PositionNotLiquidatable();
+
+        uint256 positionId = position.positionId;
+        string memory countryId = position.countryId;
+        uint256 size = position.size;
+        uint256 exitPrice = CURRENT_PRICE;
+
+        position.isOpen = false;
+
+        int256 pnl = -int256(position.size);
+
+        emit PositionClosed(positionId, countryId, user, size, pnl, exitPrice);
+    }
+
+    // Required by UUPSUpgradeable - only owner can authorize upgrades
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
