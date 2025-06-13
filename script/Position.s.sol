@@ -14,10 +14,8 @@ contract DeployUpgradeablePosition is Script {
         PredictionMarket implementation = new PredictionMarket();
         console.log("Implementation deployed to:", address(implementation));
 
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            abi.encodeWithSelector(PredictionMarket.initialize.selector)
-        );
+        ERC1967Proxy proxy =
+            new ERC1967Proxy(address(implementation), abi.encodeWithSelector(PredictionMarket.initialize.selector));
         console.log("Proxy deployed to:", address(proxy));
 
         PredictionMarket predictionMarket = PredictionMarket(address(proxy));

@@ -75,11 +75,13 @@ contract PredictionMarket is Initializable, ReentrancyGuardUpgradeable, UUPSUpgr
         CURRENT_PRICE = newPrice;
     }
 
-    function openPosition(string calldata countryId, PositionDirection direction, uint8 leverage, uint256 positionId, uint256 entryPrice)
-        external
-        payable
-        returns (address)
-    {
+    function openPosition(
+        string calldata countryId,
+        PositionDirection direction,
+        uint8 leverage,
+        uint256 positionId,
+        uint256 entryPrice
+    ) external payable returns (address) {
         if (msg.value == 0) revert SizeShouldBeGreaterThanZero();
         if (leverage < 1 || leverage > 5) revert LeverageShouldBeBetweenOneAndFive();
         if (positions[msg.sender].isOpen) revert PositionAlreadyExist();
@@ -189,7 +191,7 @@ contract PredictionMarket is Initializable, ReentrancyGuardUpgradeable, UUPSUpgr
         if (!position.isOpen) return false;
 
         uint256 percentageLoss;
-        
+
         if (position.direction == PositionDirection.LONG) {
             if (CURRENT_PRICE >= position.entryPrice) return false;
             percentageLoss = ((position.entryPrice - CURRENT_PRICE) * 10000) / position.entryPrice;

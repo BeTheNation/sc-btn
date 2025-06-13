@@ -13,14 +13,12 @@ contract SimplifiedPositionTest is Test {
 
     function setUp() public {
         PredictionMarket implementation = new PredictionMarket();
-        
-        ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
-            abi.encodeWithSelector(PredictionMarket.initialize.selector)
-        );
-        
+
+        ERC1967Proxy proxy =
+            new ERC1967Proxy(address(implementation), abi.encodeWithSelector(PredictionMarket.initialize.selector));
+
         predictionMarket = PredictionMarket(address(proxy));
-        
+
         vm.deal(trader1, 100 ether);
         vm.deal(trader2, 100 ether);
         vm.deal(address(predictionMarket), 50 ether);
@@ -29,7 +27,9 @@ contract SimplifiedPositionTest is Test {
     function test_OpenAndClosePositions() public {
         vm.startPrank(trader1);
         uint256 positionId1 = uint256(keccak256(abi.encodePacked(trader1, block.timestamp, "LONG")));
-        predictionMarket.openPosition{value: 1 ether}("USA", PredictionMarket.PositionDirection.LONG, 3, positionId1, 100);
+        predictionMarket.openPosition{value: 1 ether}(
+            "USA", PredictionMarket.PositionDirection.LONG, 3, positionId1, 100
+        );
 
         PredictionMarket.Position memory pos1 = predictionMarket.getPosition();
         assertEq(pos1.trader, trader1);
@@ -46,7 +46,9 @@ contract SimplifiedPositionTest is Test {
 
         vm.startPrank(trader2);
         uint256 positionId2 = uint256(keccak256(abi.encodePacked(trader2, block.timestamp, "SHORT")));
-        predictionMarket.openPosition{value: 0.5 ether}("GERMANY", PredictionMarket.PositionDirection.SHORT, 2, positionId2, 110);
+        predictionMarket.openPosition{value: 0.5 ether}(
+            "GERMANY", PredictionMarket.PositionDirection.SHORT, 2, positionId2, 110
+        );
 
         PredictionMarket.Position memory pos2 = predictionMarket.getPosition();
         assertEq(pos2.trader, trader2);
@@ -67,10 +69,14 @@ contract SimplifiedPositionTest is Test {
         predictionMarket.openPosition{value: 0}("USA", PredictionMarket.PositionDirection.LONG, 1, positionId, 100);
 
         vm.expectRevert(PredictionMarket.LeverageShouldBeBetweenOneAndFive.selector);
-        predictionMarket.openPosition{value: 1 ether}("USA", PredictionMarket.PositionDirection.LONG, 0, positionId, 100);
+        predictionMarket.openPosition{value: 1 ether}(
+            "USA", PredictionMarket.PositionDirection.LONG, 0, positionId, 100
+        );
 
         vm.expectRevert(PredictionMarket.LeverageShouldBeBetweenOneAndFive.selector);
-        predictionMarket.openPosition{value: 1 ether}("USA", PredictionMarket.PositionDirection.LONG, 6, positionId, 100);
+        predictionMarket.openPosition{value: 1 ether}(
+            "USA", PredictionMarket.PositionDirection.LONG, 6, positionId, 100
+        );
 
         vm.expectRevert(PredictionMarket.PositionDoesNotExist.selector);
         predictionMarket.closePosition(trader1);
@@ -84,7 +90,9 @@ contract SimplifiedPositionTest is Test {
 
         vm.startPrank(trader1);
         uint256 positionId = uint256(keccak256(abi.encodePacked(trader1, block.timestamp, "LIQUIDATION")));
-        predictionMarket.openPosition{value: 1 ether}("USA", PredictionMarket.PositionDirection.LONG, 5, positionId, 100);
+        predictionMarket.openPosition{value: 1 ether}(
+            "USA", PredictionMarket.PositionDirection.LONG, 5, positionId, 100
+        );
         vm.stopPrank();
 
         assertEq(predictionMarket.checkLiquidation(trader1), false);
