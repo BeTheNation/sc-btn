@@ -1,71 +1,66 @@
-# PredictionMarket Contract
+## Foundry
 
-Simple leveraged trading on country predictions using ETH.
+**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-## Quick Start
+Foundry consists of:
 
-```bash
-# Install Foundry
-curl -L https://foundry.paradigm.xyz | bash
-foundryup
+-   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+-   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+-   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+-   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
-# Clone and setup
-git clone <repo>
-cd sc-btn
-forge install
+## Documentation
 
-# Test
-forge test
-
-# Build
-forge build
-```
-
-## Contract
-
-**Deployed on Base Sepolia**: `0xd321D80155A27A1344ab5703cDDefD2b0fAF92e5` (Upgradeable Proxy)  
-**Implementation**: `0x53ec36A1Ab0027dCF6d9442aF42Fa43De6dAE702` ([View Code](https://sepolia.basescan.org/address/0x53ec36A1Ab0027dCF6d9442aF42Fa43De6dAE702#code))
-
-> **Note**: Always use the proxy address above for interactions. The implementation address contains your actual contract code.
-
-### Features
-- Open LONG/SHORT positions with ETH
-- 1x to 5x leverage
-- Country-based predictions
-- 0.3% transaction fee
-
-### Functions
-```solidity
-// Open position with ETH
-openPosition(countryId, direction, leverage) payable
-
-// Close position
-closePosition(sender)
-
-// View position
-getPosition()
-```
+https://book.getfoundry.sh/
 
 ## Usage
 
-```bash
-# Deploy
-forge script script/Position.s.sol --rpc-url base_sepolia --broadcast
+### Build
 
-# Test locally
-forge test -vv
+```shell
+$ forge build
 ```
 
-## Example
+### Test
 
-```solidity
-// Open LONG position on USA with 2x leverage
-market.openPosition{value: 0.01 ether}("USA", PositionDirection.LONG, 2);
-
-// Close position
-market.closePosition(msg.sender);
+```shell
+$ forge test
 ```
 
-**Entry Price**: 100 (fixed)  
-**Current Price**: 120  
-**Fee**: 30 basis points (0.3%)
+### Format
+
+```shell
+$ forge fmt
+```
+
+### Gas Snapshots
+
+```shell
+$ forge snapshot
+```
+
+### Anvil
+
+```shell
+$ anvil
+```
+
+### Deploy
+
+```shell
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
+
+### Cast
+
+```shell
+$ cast <subcommand>
+```
+
+### Help
+
+```shell
+$ forge --help
+$ anvil --help
+$ cast --help
+```
