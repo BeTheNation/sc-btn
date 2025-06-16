@@ -38,7 +38,7 @@ contract TestCompleteFlow is Script {
 
     function loadContracts() internal {
         trader = vm.addr(vm.envUint("PRIVATE_KEY"));
-        
+
         // Try to load existing contracts, if not deploy new ones
         try vm.envAddress("POSITION_MANAGER_ADDRESS") returns (address pmAddr) {
             // Check if there's code at this address
@@ -59,41 +59,35 @@ contract TestCompleteFlow is Script {
             deployNewContracts();
         }
     }
-    
+
     function deployNewContracts() internal {
         vm.startBroadcast();
-        
+
         // Deploy core contracts
         positionManager = new PositionManager();
         orderManager = new OrderManager();
-        
+
         // Deploy execution contracts
-        MarketOrderExecutor marketExecutor = new MarketOrderExecutor(
-            address(orderManager),
-            address(positionManager)
-        );
-        
-        LimitOrderManager limitManager = new LimitOrderManager(
-            address(orderManager),
-            address(positionManager)
-        );
-        
+        MarketOrderExecutor marketExecutor = new MarketOrderExecutor(address(orderManager), address(positionManager));
+
+        LimitOrderManager limitManager = new LimitOrderManager(address(orderManager), address(positionManager));
+
         liquidationManager = new LiquidationManager(address(positionManager));
-        
+
         // Setup contract connections
         orderManager.setMarketOrderExecutor(address(marketExecutor));
         orderManager.setLimitOrderManager(address(limitManager));
         orderManager.setPositionManager(address(positionManager));
-        
+
         // Authorize executors
         positionManager.setAuthorizedCaller(address(marketExecutor), true);
         positionManager.setAuthorizedCaller(address(limitManager), true);
         positionManager.setAuthorizedCaller(address(orderManager), true);
         positionManager.setAuthorizedCaller(address(liquidationManager), true);
         positionManager.setLiquidationManager(address(liquidationManager));
-        
+
         vm.stopBroadcast();
-        
+
         console.log("=== Deployment Completed ===");
         console.log("PositionManager:", address(positionManager));
         console.log("OrderManager:", address(orderManager));
@@ -106,15 +100,22 @@ contract TestCompleteFlow is Script {
         if (!hasActivePosition()) {
             console.log("Creating new position...");
             createPosition();
-            
+
             // Add a small delay to allow blockchain state to update
             console.log("Waiting for blockchain state to update...");
             vm.sleep(2000); // 2 second delay
-            
+
             // Try to fetch the position ID from the trader's position if we don't have it
             if (positionId == 0) {
                 try positionManager.getPosition(trader) returns (
-                    uint256 id, string memory, PositionManager.PositionDirection, uint256, uint8, uint256, uint256, bool isOpen
+                    uint256 id,
+                    string memory,
+                    PositionManager.PositionDirection,
+                    uint256,
+                    uint8,
+                    uint256,
+                    uint256,
+                    bool isOpen
                 ) {
                     if (isOpen) {
                         positionId = id;
@@ -143,38 +144,37 @@ contract TestCompleteFlow is Script {
         console.log("  Country: USA");
         console.log("  Direction: LONG");
         console.log("  Leverage: 2x");
-        
-        try orderManager.createMarketOrder{value: 0.000005 ether}("USA", OrderManager.PositionDirection.LONG, 2) returns (
-            uint256 id
-        ) {
+
+        try orderManager.createMarketOrder{value: 0.000005 ether}("USA", OrderManager.PositionDirection.LONG, 2)
+        returns (uint256 id) {
             positionId = id;
             console.log("Position created successfully!");
             console.log("  Position ID:", id);
             console.log("  Position value:", formatWeiToEth(0.000005 ether));
-            
         } catch Error(string memory reason) {
             console.log("Position creation failed with reason:", reason);
-            
+
             // Additional debugging - check contract states
             console.log("Debugging contract states:");
             console.log("  OrderManager address:", address(orderManager));
             console.log("  Trader balance:", trader.balance);
             console.log("  OrderManager balance:", address(orderManager).balance);
-            
         } catch (bytes memory lowLevelError) {
             console.log("Position creation failed with low-level error:");
             console.logBytes(lowLevelError);
-            
+
             // Try to decode common error signatures
             if (lowLevelError.length >= 4) {
                 bytes4 errorSelector = bytes4(lowLevelError);
                 console.log("Error selector:");
                 console.logBytes4(errorSelector);
-                
+
                 // Common error signatures
-                if (errorSelector == 0x08c379a0) { // Error(string)
+                if (errorSelector == 0x08c379a0) {
+                    // Error(string)
                     console.log("This is a revert with string message");
-                } else if (errorSelector == 0x4e487b71) { // Panic(uint256)
+                } else if (errorSelector == 0x4e487b71) {
+                    // Panic(uint256)
                     console.log("This is a panic error");
                 }
             }
@@ -190,7 +190,7 @@ contract TestCompleteFlow is Script {
         console.log("=== Closing Position ===");
         console.log("Position ID:", positionId);
         console.log("Contract balance:", address(positionManager).balance);
-        
+
         // First, let's verify the position exists and get its details
         try positionManager.positionsById(positionId) returns (
             uint256 id,
@@ -224,7 +224,7 @@ contract TestCompleteFlow is Script {
             console.logBytes(lowLevelError);
             return;
         }
-        
+
         // Try to close position through PositionManager directly (owner-only close)
         try positionManager.closePosition(positionId, 75000, false) {
             console.log("Position closed successfully through PositionManager direct call");
@@ -235,7 +235,7 @@ contract TestCompleteFlow is Script {
             console.log("Direct close failed with low-level error");
             console.logBytes(lowLevelError);
         }
-        
+
         // Try to close position through OrderManager (authorized call)
         try orderManager.closePosition(trader, 75000) {
             console.log("Position closed successfully through OrderManager");
@@ -246,7 +246,7 @@ contract TestCompleteFlow is Script {
             console.log("OrderManager close failed with low-level error");
             console.logBytes(lowLevelError);
         }
-        
+
         console.log("All closing methods failed - position remains open");
     }
 
@@ -258,7 +258,15 @@ contract TestCompleteFlow is Script {
         } catch {
             // If getPosition fails, try to check the positions mapping directly for the trader
             try positionManager.positions(trader) returns (
-                uint256, string memory, address, PositionManager.PositionDirection, uint256, uint8, uint256, uint256, bool isOpen
+                uint256,
+                string memory,
+                address,
+                PositionManager.PositionDirection,
+                uint256,
+                uint8,
+                uint256,
+                uint256,
+                bool isOpen
             ) {
                 return isOpen;
             } catch {
@@ -269,7 +277,7 @@ contract TestCompleteFlow is Script {
 
     function checkPosition(string memory stage) internal view {
         console.log("=== Position Status (%s) ===", stage);
-        
+
         // First, try to check by position ID if we have one
         if (positionId > 0) {
             console.log("Checking position by ID:", positionId);
@@ -296,7 +304,7 @@ contract TestCompleteFlow is Script {
                 console.log("  Entry Price:", entryPrice);
                 console.log("  Open Time:", openTime);
                 console.log("  Is Open:", isOpen);
-                
+
                 if (isOpen && owner == trader) {
                     console.log("  Status: ACTIVE (verified by ID)");
                 } else if (!isOpen) {
@@ -311,7 +319,7 @@ contract TestCompleteFlow is Script {
                 console.log("Failed to get position by ID (unknown error)");
             }
         }
-        
+
         // Fallback to trader-based lookup
         console.log("Checking position by trader address:", trader);
         try positionManager.getPosition(trader) returns (
@@ -334,7 +342,7 @@ contract TestCompleteFlow is Script {
             console.log("  Entry Price:", entryPrice);
             console.log("  Open Time:", openTime);
             console.log("  Is Open:", isOpen);
-            
+
             if (isOpen) {
                 console.log("  Status: ACTIVE (verified by trader)");
                 // Update our position ID if we found one
@@ -361,10 +369,12 @@ contract TestCompleteFlow is Script {
         console.log("System status: Market order flow test completed");
         console.log("Test amount: 0.000005 ETH (reduced due to account balance)");
         console.log("\nModular prediction market is working correctly");
-    }    function formatWeiToEth(uint256 wei_amount) internal pure returns (string memory) {
+    }
+
+    function formatWeiToEth(uint256 wei_amount) internal pure returns (string memory) {
         uint256 eth_part = wei_amount / 1e18;
         uint256 fraction_part = (wei_amount % 1e18) / 1e13; // 5 decimal places for small amounts
-        
+
         if (eth_part > 0) {
             return string(abi.encodePacked(vm.toString(eth_part), ".", vm.toString(fraction_part)));
         } else {
