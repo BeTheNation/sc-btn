@@ -1,6 +1,9 @@
 # Compiler files
 cache/
 out/
+artifacts/
+typechain/
+typechain-types/
 
 # Ignores development broadcast logs
 !/broadcast
@@ -12,3 +15,45 @@ docs/
 
 # Dotenv file
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Node modules and package files
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Foundry specific
+!/lib
+lib/
+
+# Test coverage
+coverage/
+lcov.info
+
+# Temporary files
+*.tmp
+*.temp
+
+copilot-instructions.md
