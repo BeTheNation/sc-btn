@@ -20,32 +20,52 @@ contract VerifyContracts is Script {
         console.log("BeTheNation Contract Verification");
         console.log("Network: Base Sepolia");
         console.log("");
-        
+
         console.log("Execute these commands to verify all contracts:");
         console.log("");
-        
+
         // Core contracts
         console.log("# PositionManager");
-        console.log("forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") %s src/PositionManager.sol:PositionManager", POSITION_MANAGER);
+        console.log(
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") %s src/PositionManager.sol:PositionManager",
+            POSITION_MANAGER
+        );
         console.log("");
-        
+
         console.log("# OrderManager");
-        console.log("forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") %s src/OrderManager.sol:OrderManager", ORDER_MANAGER);
+        console.log(
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") %s src/OrderManager.sol:OrderManager",
+            ORDER_MANAGER
+        );
         console.log("");
-        
+
         // Execution contracts
         console.log("# MarketOrderExecutor");
-        console.log("forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) %s src/MarketOrderExecutor.sol:MarketOrderExecutor", ORDER_MANAGER, POSITION_MANAGER, MARKET_ORDER_EXECUTOR);
+        console.log(
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) %s src/MarketOrderExecutor.sol:MarketOrderExecutor",
+            ORDER_MANAGER,
+            POSITION_MANAGER,
+            MARKET_ORDER_EXECUTOR
+        );
         console.log("");
-        
+
         console.log("# LimitOrderManager");
-        console.log("forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) %s src/LimitOrderManager.sol:LimitOrderManager", ORDER_MANAGER, POSITION_MANAGER, LIMIT_ORDER_MANAGER);
+        console.log(
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) %s src/LimitOrderManager.sol:LimitOrderManager",
+            ORDER_MANAGER,
+            POSITION_MANAGER,
+            LIMIT_ORDER_MANAGER
+        );
         console.log("");
-        
+
         console.log("# LiquidationManager");
-        console.log("forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address)\" %s) %s src/LiquidationManager.sol:LiquidationManager", POSITION_MANAGER, LIQUIDATION_MANAGER);
+        console.log(
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address)\" %s) %s src/LiquidationManager.sol:LiquidationManager",
+            POSITION_MANAGER,
+            LIQUIDATION_MANAGER
+        );
         console.log("");
-        
+
         console.log("Verification complete.");
     }
 }
