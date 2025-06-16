@@ -11,9 +11,6 @@ Modular prediction market smart contract system built with Foundry and deployed 
 - **LimitOrderManager**: [`0xc012801c5CFCD09447310aFA744edB5B570D48cC`](https://sepolia.basescan.org/address/0xc012801c5CFCD09447310aFA744edB5B570D48cC)
 - **LiquidationManager**: [`0x3C75cBDEb7D6088Ab0E1A5BA310a40F67B8fF75C`](https://sepolia.basescan.org/address/0x3C75cBDEb7D6088Ab0E1A5BA310a40F67B8fF75C)
 
-### Legacy Contract
-- **PredictionMarket** (v1): [`0x4d1059715a072C21E5D56e881f6A9E1b9582F8d0`](https://sepolia.basescan.org/address/0x4d1059715a072c21e5d56e881f6a9e1b9582f8d0)
-
 **Network**: Base Sepolia (Chain ID: 84532)  
 **Status**: ✅ All contracts verified on BaseScan
 
