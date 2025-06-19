@@ -29,6 +29,8 @@ interface IOrderManager {
 
     function closePosition(address trader, uint256 exitPrice) external;
 
+    function closePositionById(uint256 positionId, uint256 exitPrice) external;
+
     function getPosition(address trader)
         external
         view
@@ -42,4 +44,11 @@ interface IOrderManager {
             uint256 openTime,
             bool isOpen
         );
+
+    function getTraderPositions(address trader)
+        external
+        view
+        returns (uint256[] memory positionIds, bytes memory positionsData);
+
+    function getOpenPositionsCount(address trader) external view returns (uint256);
 }

@@ -137,6 +137,23 @@ contract OrderManager {
         }
     }
 
+    function closePositionById(uint256 positionId, uint256 exitPrice) 
+        external 
+        nonReentrant 
+    {
+        if (positionManager == address(0)) revert ContractNotSet();
+
+        (bool success, bytes memory data) = positionManager.call(
+            abi.encodeWithSignature("closePositionById(uint256,uint256,bool)", positionId, exitPrice, false)
+        );
+
+        if (!success) {
+            assembly {
+                revert(add(data, 0x20), mload(data))
+            }
+        }
+    }
+
     function getPosition(address trader)
         external
         view
@@ -158,6 +175,33 @@ contract OrderManager {
 
         require(success, "Failed to get position");
         return abi.decode(data, (uint256, string, PositionDirection, uint256, uint8, uint256, uint256, bool));
+    }
+
+    function getTraderPositions(address trader) 
+        external 
+        view 
+        returns (uint256[] memory positionIds, bytes memory positionsData) 
+    {
+        if (positionManager == address(0)) revert ContractNotSet();
+
+        (bool success, bytes memory data) = positionManager.staticcall(
+            abi.encodeWithSignature("getTraderPositions(address)", trader)
+        );
+
+        require(success, "Failed to get trader positions");
+        (uint256[] memory ids, ) = abi.decode(data, (uint256[], bytes));
+        return (ids, data);
+    }
+
+    function getOpenPositionsCount(address trader) external view returns (uint256) {
+        if (positionManager == address(0)) revert ContractNotSet();
+
+        (bool success, bytes memory data) = positionManager.staticcall(
+            abi.encodeWithSignature("getOpenPositionsCount(address)", trader)
+        );
+
+        require(success, "Failed to get open positions count");
+        return abi.decode(data, (uint256));
     }
 
     function transferOwnership(address newOwner) external onlyOwner {

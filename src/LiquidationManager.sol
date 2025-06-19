@@ -96,7 +96,7 @@ contract LiquidationManager {
         liquidatorReward = ((size / leverage) * LIQUIDATION_BONUS) / 10000;
 
         (bool closeSuccess,) = positionManager.call(
-            abi.encodeWithSignature("closePosition(uint256,uint256,bool)", positionId, currentPrice, true)
+            abi.encodeWithSignature("closePositionById(uint256,uint256,bool)", positionId, currentPrice, true)
         );
 
         if (!closeSuccess) revert LiquidationFailed();

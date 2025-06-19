@@ -4,17 +4,17 @@ A modular prediction market system for country-based trading outcomes. Built wit
 
 ## Overview
 
-BeTheNation enables users to trade positions on country-based predictions using a modular smart contract architecture. The system supports market orders, limit orders, and automatic position liquidation.
+BeTheNation enables users to trade positions on country-based predictions using a modular smart contract architecture. The system supports market orders, limit orders, automatic position liquidation, and **multiple positions per trader**.
 
 ## Deployed Contracts
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| PositionManager | `0xA62F56b0BE223e60457f652f08DdEd7E173c1022` | [View](https://sepolia.basescan.org/address/0xA62F56b0BE223e60457f652f08DdEd7E173c1022) |
-| OrderManager | `0x30B9Ff7eC9Ca3d3f85044ae23A8E61cB1FFA32cB` | [View](https://sepolia.basescan.org/address/0x30B9Ff7eC9Ca3d3f85044ae23A8E61cB1FFA32cB) |
-| MarketOrderExecutor | `0x20af2912a5203B777fBEc7279F62d8c89b811b63` | [View](https://sepolia.basescan.org/address/0x20af2912a5203B777fBEc7279F62d8c89b811b63) |
-| LimitOrderManager | `0xc012801c5CFCD09447310aFA744edB5B570D48cC` | [View](https://sepolia.basescan.org/address/0xc012801c5CFCD09447310aFA744edB5B570D48cC) |
-| LiquidationManager | `0x3C75cBDEb7D6088Ab0E1A5BA310a40F67B8fF75C` | [View](https://sepolia.basescan.org/address/0x3C75cBDEb7D6088Ab0E1A5BA310a40F67B8fF75C) |
+| PositionManager | `0x9fead44f799927BaBc81598fF6134543A2240173` | [View](https://sepolia.basescan.org/address/0x9fead44f799927BaBc81598fF6134543A2240173) |
+| OrderManager | `0x369327Cb1f9E164A20215Bb12024108BdbE1c8E1` | [View](https://sepolia.basescan.org/address/0x369327Cb1f9E164A20215Bb12024108BdbE1c8E1) |
+| MarketOrderExecutor | `0x682aaED27CD2991f8864062eb9aB5bf58010341F` | [View](https://sepolia.basescan.org/address/0x682aaED27CD2991f8864062eb9aB5bf58010341F) |
+| LimitOrderManager | `0x6e7F0a5c8a671E5BC316029cCbcfA27A094073aE` | [View](https://sepolia.basescan.org/address/0x6e7F0a5c8a671E5BC316029cCbcfA27A094073aE) |
+| LiquidationManager | `0xB17D986306401cbd34E25ecC38c7ec8e094B520c` | [View](https://sepolia.basescan.org/address/0xB17D986306401cbd34E25ecC38c7ec8e094B520c) |
 
 **Network**: Base Sepolia (Chain ID: 84532)
 
@@ -80,11 +80,14 @@ The system uses five specialized contracts:
 - Core position lifecycle management
 - Collateral handling
 - Position state tracking
+- **Multiple positions per trader support**
+- **Position ID-based management**
 
 **OrderManager**
 - Order routing and validation
 - Execution coordination
 - Order type management
+- **Multiple position creation**
 
 **MarketOrderExecutor**
 - Immediate order execution
@@ -106,12 +109,30 @@ The system uses five specialized contracts:
 ### Market Order (Solidity)
 ```solidity
 // Open a long position on USA with 2x leverage
-IOrderManager(orderManager).executeMarketOrder(
+IOrderManager(orderManager).createMarketOrder(
     "USA",           // country
-    true,            // isLong
-    2,              // leverage
+    0,               // direction (0=LONG, 1=SHORT)
+    2               // leverage
     {value: 0.001 ether}
 );
+```
+
+### Multiple Positions Management
+```solidity
+// Create multiple positions for the same trader
+uint256 positionId1 = orderManager.createMarketOrder{value: 0.001 ether}("USA", 0, 2);
+uint256 positionId2 = orderManager.createMarketOrder{value: 0.001 ether}("UK", 1, 3);
+uint256 positionId3 = orderManager.createMarketOrder{value: 0.001 ether}("JP", 0, 1);
+
+// Get all positions for a trader
+(uint256[] memory positionIds, IPositionManager.Position[] memory positions) = 
+    positionManager.getTraderPositions(trader);
+
+// Get open positions count
+uint256 openCount = positionManager.getOpenPositionsCount(trader);
+
+// Close specific position by ID
+positionManager.closePositionById(positionId2, exitPrice, false);
 ```
 
 ### TypeScript Integration
@@ -123,10 +144,10 @@ import { parseEther } from 'viem';
 const { writeContractAsync } = useWriteContract();
 
 await writeContractAsync({
-  address: '0x30B9Ff7eC9Ca3d3f85044ae23A8E61cB1FFA32cB',
+  address: '0x369327Cb1f9E164A20215Bb12024108BdbE1c8E1',
   abi: orderManagerAbi,
-  functionName: 'executeMarketOrder',
-  args: ['USA', true, 2],
+  functionName: 'createMarketOrder',
+  args: ['USA', 0, 2], // country, direction (0=LONG, 1=SHORT), leverage
   value: parseEther('0.001'),
 });
 ```

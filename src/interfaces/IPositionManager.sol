@@ -34,6 +34,29 @@ interface IPositionManager {
 
     function closePosition(address trader, uint256 exitPrice, address caller) external;
 
+    function closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation) external;
+
+    function getTraderPositions(address trader)
+        external
+        view
+        returns (uint256[] memory positionIds, Position[] memory positions);
+
+    function getOpenPositionsCount(address trader) external view returns (uint256);
+
+    function getPosition(uint256 positionId)
+        external
+        view
+        returns (
+            address trader,
+            string memory countryId,
+            uint8 direction,
+            uint256 size,
+            uint8 leverage,
+            uint256 entryPrice,
+            uint256 timestamp,
+            bool isActive
+        );
+
     function getPosition(address trader)
         external
         view

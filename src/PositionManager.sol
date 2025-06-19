@@ -23,8 +23,10 @@ contract PositionManager {
         bool isOpen;
     }
 
-    mapping(address => Position) public positions;
+    uint256 public constant MAX_POSITIONS_PER_TRADER = 10; //Position limit
+
     mapping(uint256 => Position) public positionsById;
+    mapping(address => uint256[]) public traderPositions; //track positions per trader
     uint256 public nextPositionId;
     mapping(address => bool) public authorizedCallers;
     address public owner;
@@ -54,11 +56,11 @@ contract PositionManager {
 
     error OnlyAuthorized();
     error OnlyOwner();
-    error PositionAlreadyExist();
     error PositionDoesNotExist();
     error NotTheOwner();
     error InvalidPrice();
     error ReentrantCall();
+    error TooManyPositions();
 
     modifier onlyAuthorized() {
         if (!authorizedCallers[msg.sender]) revert OnlyAuthorized();
@@ -105,12 +107,15 @@ contract PositionManager {
         uint8 leverage,
         uint256 entryPrice
     ) external payable onlyAuthorized nonReentrant returns (uint256) {
-        if (positions[trader].isOpen) revert PositionAlreadyExist();
         if (entryPrice == 0) revert InvalidPrice();
+
+        // Check position limit
+        uint256 openCount = this.getOpenPositionsCount(trader);
+        if (openCount >= MAX_POSITIONS_PER_TRADER) revert TooManyPositions();
 
         uint256 positionId = nextPositionId++;
 
-        positions[trader] = Position({
+        Position memory newPosition = Position({
             positionId: positionId,
             countryId: countryId,
             trader: trader,
@@ -122,8 +127,8 @@ contract PositionManager {
             isOpen: true
         });
 
-        // Store in both mappings for easy access
-        positionsById[positionId] = positions[trader];
+        positionsById[positionId] = newPosition;
+        traderPositions[trader].push(positionId); // Add to trader's position list
 
         emit PositionOpened(positionId, countryId, trader, PositionDirection(direction), size, entryPrice);
 
@@ -135,42 +140,47 @@ contract PositionManager {
         onlyAuthorized
         nonReentrant
     {
-        Position storage position = positions[trader];
+        // Find first open position for backward compatibility
+        uint256[] memory positions = traderPositions[trader];
+        uint256 positionToClose = 0;
+        
+        for (uint256 i = 0; i < positions.length; i++) {
+            if (positionsById[positions[i]].isOpen) {
+                positionToClose = positions[i];
+                break;
+            }
+        }
+        
+        if (positionToClose == 0) revert PositionDoesNotExist();
+        
+        _closePositionById(positionToClose, exitPrice, false);
+    }
+
+    function closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation) 
+        external 
+        onlyAuthorized 
+        nonReentrant 
+    {
+        _closePositionById(positionId, exitPrice, isLiquidation);
+    }
+
+    function _closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation) 
+        internal 
+    {
+        Position storage position = positionsById[positionId];
 
         if (!position.isOpen) revert PositionDoesNotExist();
         if (exitPrice == 0) revert InvalidPrice();
+
+        if (isLiquidation) {
+            require(msg.sender == liquidationManager, "Only liquidation manager for liquidations");
+        }
 
         (int256 pnl, uint256 payout) = _calculatePnL(position, exitPrice);
 
         position.isOpen = false;
 
-        emit PositionClosed(position.positionId, position.countryId, trader, position.size, pnl, exitPrice);
-
-        if (payout > 0) {
-            (bool success,) = payable(trader).call{value: payout}("");
-            require(success, "Transfer failed");
-        }
-    }
-
-    function closePosition(uint256 positionId, uint256 closingPrice, bool isLiquidation) external {
-        Position storage position = positionsById[positionId];
-
-        if (!position.isOpen) revert PositionDoesNotExist();
-
-        if (isLiquidation) {
-            require(msg.sender == liquidationManager, "Only liquidation manager for liquidations");
-        } else {
-            require(msg.sender == position.trader, "Only position owner");
-        }
-
-        if (closingPrice == 0) revert InvalidPrice();
-
-        (int256 pnl, uint256 payout) = _calculatePnL(position, closingPrice);
-
-        position.isOpen = false;
-        positions[position.trader].isOpen = false; // Update both mappings
-
-        emit PositionClosed(position.positionId, position.countryId, position.trader, position.size, pnl, closingPrice);
+        emit PositionClosed(position.positionId, position.countryId, position.trader, position.size, pnl, exitPrice);
 
         if (payout > 0) {
             (bool success,) = payable(position.trader).call{value: payout}("");
@@ -250,17 +260,51 @@ contract PositionManager {
             bool isOpen
         )
     {
-        Position memory position = positions[trader];
-        return (
-            position.positionId,
-            position.countryId,
-            position.direction,
-            position.size,
-            position.leverage,
-            position.entryPrice,
-            position.openTime,
-            position.isOpen
-        );
+        // Return the first open position for backward compatibility
+        uint256[] memory positions = traderPositions[trader];
+        
+        for (uint256 i = 0; i < positions.length; i++) {
+            Position memory pos = positionsById[positions[i]];
+            if (pos.isOpen) {
+                return (
+                    pos.positionId,
+                    pos.countryId,
+                    pos.direction,
+                    pos.size,
+                    pos.leverage,
+                    pos.entryPrice,
+                    pos.openTime,
+                    pos.isOpen
+                );
+            }
+        }
+        
+        // Return empty if no open position
+        return (0, "", PositionDirection.LONG, 0, 0, 0, 0, false);
+    }
+
+    function getTraderPositions(address trader) 
+        external 
+        view 
+        returns (uint256[] memory positionIds, Position[] memory positions) 
+    {
+        uint256[] memory traderPosIds = traderPositions[trader];
+        Position[] memory traderPos = new Position[](traderPosIds.length);
+        
+        for (uint256 i = 0; i < traderPosIds.length; i++) {
+            traderPos[i] = positionsById[traderPosIds[i]];
+        }
+        
+        return (traderPosIds, traderPos);
+    }
+
+    function getOpenPositionsCount(address trader) external view returns (uint256 count) {
+        uint256[] memory positions = traderPositions[trader];
+        for (uint256 i = 0; i < positions.length; i++) {
+            if (positionsById[positions[i]].isOpen) {
+                count++;
+            }
+        }
     }
 
     function getPosition(uint256 positionId)
