@@ -143,30 +143,28 @@ contract PositionManager {
         // Find first open position for backward compatibility
         uint256[] memory positions = traderPositions[trader];
         uint256 positionToClose = 0;
-        
+
         for (uint256 i = 0; i < positions.length; i++) {
             if (positionsById[positions[i]].isOpen) {
                 positionToClose = positions[i];
                 break;
             }
         }
-        
+
         if (positionToClose == 0) revert PositionDoesNotExist();
-        
+
         _closePositionById(positionToClose, exitPrice, false);
     }
 
-    function closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation) 
-        external 
-        onlyAuthorized 
-        nonReentrant 
+    function closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation)
+        external
+        onlyAuthorized
+        nonReentrant
     {
         _closePositionById(positionId, exitPrice, isLiquidation);
     }
 
-    function _closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation) 
-        internal 
-    {
+    function _closePositionById(uint256 positionId, uint256 exitPrice, bool isLiquidation) internal {
         Position storage position = positionsById[positionId];
 
         if (!position.isOpen) revert PositionDoesNotExist();
@@ -262,7 +260,7 @@ contract PositionManager {
     {
         // Return the first open position for backward compatibility
         uint256[] memory positions = traderPositions[trader];
-        
+
         for (uint256 i = 0; i < positions.length; i++) {
             Position memory pos = positionsById[positions[i]];
             if (pos.isOpen) {
@@ -278,23 +276,23 @@ contract PositionManager {
                 );
             }
         }
-        
+
         // Return empty if no open position
         return (0, "", PositionDirection.LONG, 0, 0, 0, 0, false);
     }
 
-    function getTraderPositions(address trader) 
-        external 
-        view 
-        returns (uint256[] memory positionIds, Position[] memory positions) 
+    function getTraderPositions(address trader)
+        external
+        view
+        returns (uint256[] memory positionIds, Position[] memory positions)
     {
         uint256[] memory traderPosIds = traderPositions[trader];
         Position[] memory traderPos = new Position[](traderPosIds.length);
-        
+
         for (uint256 i = 0; i < traderPosIds.length; i++) {
             traderPos[i] = positionsById[traderPosIds[i]];
         }
-        
+
         return (traderPosIds, traderPos);
     }
 

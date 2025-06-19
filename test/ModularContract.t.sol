@@ -297,16 +297,19 @@ contract ModularContractTest is Test {
         vm.startPrank(user1);
 
         // Create multiple positions
-        uint256 positionId1 = orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2);
-        uint256 positionId2 = orderManager.createMarketOrder{value: 1 ether}("UK", OrderManager.PositionDirection.SHORT, 3);
-        uint256 positionId3 = orderManager.createMarketOrder{value: 1 ether}("JP", OrderManager.PositionDirection.LONG, 1);
+        uint256 positionId1 =
+            orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2);
+        uint256 positionId2 =
+            orderManager.createMarketOrder{value: 1 ether}("UK", OrderManager.PositionDirection.SHORT, 3);
+        uint256 positionId3 =
+            orderManager.createMarketOrder{value: 1 ether}("JP", OrderManager.PositionDirection.LONG, 1);
 
         // Check positions count
         uint256 openCount = orderManager.getOpenPositionsCount(user1);
         assertEq(openCount, 3);
 
         // Get all positions
-        (uint256[] memory positionIds, ) = orderManager.getTraderPositions(user1);
+        (uint256[] memory positionIds,) = orderManager.getTraderPositions(user1);
         assertEq(positionIds.length, 3);
         assertEq(positionIds[0], positionId1);
         assertEq(positionIds[1], positionId2);
@@ -320,12 +323,12 @@ contract ModularContractTest is Test {
         assertEq(remainingCount, 2);
 
         // Verify correct position was closed
-        (, , , , , , , bool isOpen2) = positionManager.getPosition(positionId2);
+        (,,,,,,, bool isOpen2) = positionManager.getPosition(positionId2);
         assertFalse(isOpen2);
 
         // Verify other positions still open
-        (, , , , , , , bool isOpen1) = positionManager.getPosition(positionId1);
-        (, , , , , , , bool isOpen3) = positionManager.getPosition(positionId3);
+        (,,,,,,, bool isOpen1) = positionManager.getPosition(positionId1);
+        (,,,,,,, bool isOpen3) = positionManager.getPosition(positionId3);
         assertTrue(isOpen1);
         assertTrue(isOpen3);
 
@@ -336,17 +339,22 @@ contract ModularContractTest is Test {
         vm.startPrank(user1);
 
         // Create maximum positions (10)
-        for (uint i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < 10; i++) {
             orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2);
         }
 
         uint256 openCount = orderManager.getOpenPositionsCount(user1);
         assertEq(openCount, 10);
 
-        // Try to create 11th position - should fail with TooManyPositions
-        // We'll check that it reverts, even if the error doesn't propagate perfectly
-        vm.expectRevert();
-        orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2);
+        // Try to create 11th position - should fail
+        bool reverted = false;
+        try orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2) {
+            // Should not reach here
+        } catch {
+            reverted = true;
+        }
+
+        assertTrue(reverted, "Should have reverted when creating 11th position");
 
         vm.stopPrank();
     }
@@ -355,18 +363,20 @@ contract ModularContractTest is Test {
         vm.startPrank(user1);
 
         // Create multiple positions
-        uint256 positionId1 = orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2);
-        uint256 positionId2 = orderManager.createMarketOrder{value: 1 ether}("UK", OrderManager.PositionDirection.SHORT, 3);
+        uint256 positionId1 =
+            orderManager.createMarketOrder{value: 1 ether}("USA", OrderManager.PositionDirection.LONG, 2);
+        uint256 positionId2 =
+            orderManager.createMarketOrder{value: 1 ether}("UK", OrderManager.PositionDirection.SHORT, 3);
 
         // Old closePosition function should close first open position
         orderManager.closePosition(user1, 80000);
 
         // Check that first position was closed
-        (, , , , , , , bool isOpen1) = positionManager.getPosition(positionId1);
+        (,,,,,,, bool isOpen1) = positionManager.getPosition(positionId1);
         assertFalse(isOpen1);
 
         // Check that second position is still open
-        (, , , , , , , bool isOpen2) = positionManager.getPosition(positionId2);
+        (,,,,,,, bool isOpen2) = positionManager.getPosition(positionId2);
         assertTrue(isOpen2);
 
         vm.stopPrank();

@@ -9,15 +9,15 @@ import "forge-std/Script.sol";
  * @dev Generates verification commands for all modular contracts
  */
 contract VerifyContracts is Script {
-    // Contract addresses from latest deployment
-    address constant POSITION_MANAGER = 0xA62F56b0BE223e60457f652f08DdEd7E173c1022;
-    address constant ORDER_MANAGER = 0x30B9Ff7eC9Ca3d3f85044ae23A8E61cB1FFA32cB;
-    address constant MARKET_ORDER_EXECUTOR = 0x20af2912a5203B777fBEc7279F62d8c89b811b63;
-    address constant LIMIT_ORDER_MANAGER = 0xc012801c5CFCD09447310aFA744edB5B570D48cC;
-    address constant LIQUIDATION_MANAGER = 0x3C75cBDEb7D6088Ab0E1A5BA310a40F67B8fF75C;
+    // Current deployed addresses - Multiple Positions Support
+    address constant POSITION_MANAGER = 0x9fead44f799927BaBc81598fF6134543A2240173;
+    address constant ORDER_MANAGER = 0x369327Cb1f9E164A20215Bb12024108BdbE1c8E1;
+    address constant MARKET_ORDER_EXECUTOR = 0x682aaED27CD2991f8864062eb9aB5bf58010341F;
+    address constant LIMIT_ORDER_MANAGER = 0x6e7F0a5c8a671E5BC316029cCbcfA27A094073aE;
+    address constant LIQUIDATION_MANAGER = 0xB17D986306401cbd34E25ecC38c7ec8e094B520c;
 
     function run() external view {
-        console.log("BeTheNation Contract Verification");
+        console.log("BeTheNation Contract Verification - Multiple Positions Support");
         console.log("Network: Base Sepolia");
         console.log("");
 
@@ -27,14 +27,14 @@ contract VerifyContracts is Script {
         // Core contracts
         console.log("# PositionManager");
         console.log(
-            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") %s src/PositionManager.sol:PositionManager",
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") --etherscan-api-key $BASESCAN_API_KEY %s src/PositionManager.sol:PositionManager",
             POSITION_MANAGER
         );
         console.log("");
 
         console.log("# OrderManager");
         console.log(
-            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") %s src/OrderManager.sol:OrderManager",
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor()\") --etherscan-api-key $BASESCAN_API_KEY %s src/OrderManager.sol:OrderManager",
             ORDER_MANAGER
         );
         console.log("");
@@ -42,7 +42,7 @@ contract VerifyContracts is Script {
         // Execution contracts
         console.log("# MarketOrderExecutor");
         console.log(
-            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) %s src/MarketOrderExecutor.sol:MarketOrderExecutor",
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) --etherscan-api-key $BASESCAN_API_KEY %s src/MarketOrderExecutor.sol:MarketOrderExecutor",
             ORDER_MANAGER,
             POSITION_MANAGER,
             MARKET_ORDER_EXECUTOR
@@ -51,7 +51,7 @@ contract VerifyContracts is Script {
 
         console.log("# LimitOrderManager");
         console.log(
-            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) %s src/LimitOrderManager.sol:LimitOrderManager",
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address,address)\" %s %s) --etherscan-api-key $BASESCAN_API_KEY %s src/LimitOrderManager.sol:LimitOrderManager",
             ORDER_MANAGER,
             POSITION_MANAGER,
             LIMIT_ORDER_MANAGER
@@ -60,12 +60,12 @@ contract VerifyContracts is Script {
 
         console.log("# LiquidationManager");
         console.log(
-            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address)\" %s) %s src/LiquidationManager.sol:LiquidationManager",
+            "forge verify-contract --chain base-sepolia --constructor-args $(cast abi-encode \"constructor(address)\" %s) --etherscan-api-key $BASESCAN_API_KEY %s src/LiquidationManager.sol:LiquidationManager",
             POSITION_MANAGER,
             LIQUIDATION_MANAGER
         );
         console.log("");
 
-        console.log("Verification complete.");
+        console.log("Verification complete - Multiple Positions Support Ready!");
     }
 }

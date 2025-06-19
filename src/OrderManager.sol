@@ -137,10 +137,7 @@ contract OrderManager {
         }
     }
 
-    function closePositionById(uint256 positionId, uint256 exitPrice) 
-        external 
-        nonReentrant 
-    {
+    function closePositionById(uint256 positionId, uint256 exitPrice) external nonReentrant {
         if (positionManager == address(0)) revert ContractNotSet();
 
         (bool success, bytes memory data) = positionManager.call(
@@ -177,28 +174,26 @@ contract OrderManager {
         return abi.decode(data, (uint256, string, PositionDirection, uint256, uint8, uint256, uint256, bool));
     }
 
-    function getTraderPositions(address trader) 
-        external 
-        view 
-        returns (uint256[] memory positionIds, bytes memory positionsData) 
+    function getTraderPositions(address trader)
+        external
+        view
+        returns (uint256[] memory positionIds, bytes memory positionsData)
     {
         if (positionManager == address(0)) revert ContractNotSet();
 
-        (bool success, bytes memory data) = positionManager.staticcall(
-            abi.encodeWithSignature("getTraderPositions(address)", trader)
-        );
+        (bool success, bytes memory data) =
+            positionManager.staticcall(abi.encodeWithSignature("getTraderPositions(address)", trader));
 
         require(success, "Failed to get trader positions");
-        (uint256[] memory ids, ) = abi.decode(data, (uint256[], bytes));
+        (uint256[] memory ids,) = abi.decode(data, (uint256[], bytes));
         return (ids, data);
     }
 
     function getOpenPositionsCount(address trader) external view returns (uint256) {
         if (positionManager == address(0)) revert ContractNotSet();
 
-        (bool success, bytes memory data) = positionManager.staticcall(
-            abi.encodeWithSignature("getOpenPositionsCount(address)", trader)
-        );
+        (bool success, bytes memory data) =
+            positionManager.staticcall(abi.encodeWithSignature("getOpenPositionsCount(address)", trader));
 
         require(success, "Failed to get open positions count");
         return abi.decode(data, (uint256));
