@@ -29,7 +29,6 @@ pnpm-debug.log*
 .pnpm-store/
 
 # IDE and editor files
-.vscode/
 .idea/
 *.swp
 *.swo

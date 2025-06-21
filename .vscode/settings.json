@@ -1,11 +1,18 @@
 {
-    "wake.compiler.solc.remappings": [
-        "@openzeppelin/=lib/openzeppelin-contracts/",
-        "chainlink-brownie-contracts/=lib/chainlink-brownie-contracts/",
-        "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
-        "forge-std/=lib/forge-std/src/",
-        "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
-        "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
-        "openzeppelin-contracts/=lib/openzeppelin-contracts/"
-    ]
+  "wake.compiler.solc.remappings": [
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "chainlink-brownie-contracts/=lib/chainlink-brownie-contracts/",
+    "erc4626-tests/=lib/openzeppelin-contracts-upgradeable/lib/erc4626-tests/",
+    "forge-std/=lib/forge-std/src/",
+    "halmos-cheatcodes/=lib/openzeppelin-contracts-upgradeable/lib/halmos-cheatcodes/src/",
+    "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/"
+  ],
+  "editor.formatOnSave": true,
+  "[solidity]": {
+    "editor.defaultFormatter": "JuanBlanco.solidity"
+  },
+  "solidity.formatter": "forge",
+  "solidity.packageDefaultDependenciesContractsDirectory": "contracts",
+  "solidity.packageDefaultDependenciesDirectory": "lib"
 }
